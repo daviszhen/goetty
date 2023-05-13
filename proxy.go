@@ -5,6 +5,7 @@ import (
 	"io"
 	"sync"
 	"time"
+	"fmt"
 
 	"go.uber.org/zap"
 )
@@ -95,10 +96,18 @@ func (p *proxy) handleSession(conn IOSession) error {
 	srcConn := conn.RawConn()
 	dstConn := upstreamConn.RawConn()
 
+	srcConnInfo := zap.String("conn(mysql client <--> proxy.go)",
+		fmt.Sprintf("%s -> %s",srcConn.RemoteAddr().String(),srcConn.LocalAddr().String()))
+	dstConnInfo :=zap.String("upstream(proxy.go <--> mo.frontend)",
+		fmt.Sprintf("%s -> %s",dstConn.LocalAddr().String(),dstConn.RemoteAddr()))
+
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		p.logger.Info("copy upstream(proxy.go <--> mo.frontend) => conn(mysql client <--> proxy.go)",
+			dstConnInfo, srcConnInfo)
 		_, err := io.Copy(srcConn, dstConn)
 		if err != nil {
 			p.logger.Error("copy data from upstream to client failed",
@@ -106,6 +115,9 @@ func (p *proxy) handleSession(conn IOSession) error {
 				zap.Error(err))
 		}
 	}()
+
+	p.logger.Info("copy conn(mysql client <--> proxy.go) => upstream(proxy.go <--> mo.frontend)",
+		srcConnInfo,dstConnInfo)
 	_, err = io.Copy(dstConn, srcConn)
 	if err != nil {
 		p.logger.Error("copy data from client to upstream failed",

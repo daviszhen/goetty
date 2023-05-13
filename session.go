@@ -507,6 +507,9 @@ func (bio *baseIO) readFromConn(timeout time.Duration) (any, bool, error) {
 
 func (bio *baseIO) closeConn() {
 	if bio.conn != nil {
+		fmt.Printf("disconnect remote:%s -> local:%s",
+			bio.conn.RemoteAddr().String(),
+			bio.conn.LocalAddr().String())
 		if err := bio.conn.Close(); err != nil {
 			bio.logger.Error("close conneciton failed",
 				zap.Error(err))
